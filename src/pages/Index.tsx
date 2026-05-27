@@ -467,75 +467,534 @@ function StatsSection() {
   );
 }
 
+// ─── Типы для профиля и конструктора тестов ─────────────────────────────────
+
+interface ProfileData {
+  firstName: string;
+  lastName: string;
+  middleName: string;
+  email: string;
+  phone: string;
+  organization: string;
+  specialty: string;
+  role: "student" | "teacher";
+}
+
+interface QuestionOption {
+  id: number;
+  text: string;
+  correct: boolean;
+}
+
+interface Question {
+  id: number;
+  text: string;
+  options: QuestionOption[];
+}
+
+interface CreatedTest {
+  id: number;
+  title: string;
+  subject: string;
+  difficulty: string;
+  timeLimit: number;
+  questions: Question[];
+  passingScore: number;
+}
+
+// ─── Конструктор тестов ───────────────────────────────────────────────────────
+
+function TestBuilder({ onClose, onSave }: { onClose: () => void; onSave: (test: CreatedTest) => void }) {
+  const [step, setStep] = useState<"info" | "questions" | "done">("info");
+  const [title, setTitle] = useState("");
+  const [subject, setSubject] = useState("");
+  const [difficulty, setDifficulty] = useState("Средний");
+  const [timeLimit, setTimeLimit] = useState("30");
+  const [passingScore, setPassingScore] = useState("70");
+  const [questions, setQuestions] = useState<Question[]>([
+    { id: 1, text: "", options: [
+      { id: 1, text: "", correct: true },
+      { id: 2, text: "", correct: false },
+      { id: 3, text: "", correct: false },
+      { id: 4, text: "", correct: false },
+    ]},
+  ]);
+  const [activeQ, setActiveQ] = useState(0);
+
+  const currentQ = questions[activeQ];
+
+  const addQuestion = () => {
+    const newQ: Question = {
+      id: Date.now(),
+      text: "",
+      options: [
+        { id: 1, text: "", correct: true },
+        { id: 2, text: "", correct: false },
+        { id: 3, text: "", correct: false },
+        { id: 4, text: "", correct: false },
+      ],
+    };
+    setQuestions(prev => [...prev, newQ]);
+    setActiveQ(questions.length);
+  };
+
+  const removeQuestion = (idx: number) => {
+    if (questions.length === 1) return;
+    setQuestions(prev => prev.filter((_, i) => i !== idx));
+    setActiveQ(Math.max(0, activeQ - 1));
+  };
+
+  const updateQuestion = (text: string) => {
+    setQuestions(prev => prev.map((q, i) => i === activeQ ? { ...q, text } : q));
+  };
+
+  const updateOption = (optId: number, text: string) => {
+    setQuestions(prev => prev.map((q, i) =>
+      i === activeQ ? { ...q, options: q.options.map(o => o.id === optId ? { ...o, text } : o) } : q
+    ));
+  };
+
+  const setCorrect = (optId: number) => {
+    setQuestions(prev => prev.map((q, i) =>
+      i === activeQ ? { ...q, options: q.options.map(o => ({ ...o, correct: o.id === optId })) } : q
+    ));
+  };
+
+  const handleSave = () => {
+    onSave({
+      id: Date.now(),
+      title,
+      subject,
+      difficulty,
+      timeLimit: parseInt(timeLimit) || 30,
+      questions,
+      passingScore: parseInt(passingScore) || 70,
+    });
+    setStep("done");
+  };
+
+  const inputCls = "w-full bg-input border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+      <div className="w-full max-w-3xl bg-card border border-border rounded-2xl shadow-2xl animate-scale-in flex flex-col max-h-[90vh]" style={{ animationFillMode: "forwards" }}>
+        {/* Шапка */}
+        <div className="flex items-center justify-between p-6 border-b border-border flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-lg bg-primary flex items-center justify-center">
+              <Icon name="PenLine" size={18} className="text-white" />
+            </div>
+            <div>
+              <h2 className="font-bold text-foreground">Конструктор тестов</h2>
+              <p className="text-xs text-muted-foreground">
+                {step === "info" ? "Шаг 1: Информация о тесте" : step === "questions" ? `Шаг 2: Вопросы (${questions.length})` : "Тест создан"}
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 rounded-lg hover:bg-secondary flex items-center justify-center transition-colors">
+            <Icon name="X" size={16} className="text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Контент */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {step === "done" ? (
+            <div className="text-center py-8">
+              <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+                <Icon name="CheckCircle" size={32} className="text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-bold text-foreground mb-2">Тест создан!</h3>
+              <p className="text-muted-foreground mb-2">«{title}» — {questions.length} вопросов</p>
+              <p className="text-sm text-muted-foreground mb-6">Тест добавлен в раздел «Мои тесты» и доступен ученикам</p>
+              <Button onClick={onClose} className="bg-primary text-white hover:bg-primary/90 gap-2">
+                <Icon name="ArrowLeft" size={16} />
+                Вернуться
+              </Button>
+            </div>
+          ) : step === "info" ? (
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Название теста *</label>
+                  <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Например: Основы физики" className={inputCls} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Предмет *</label>
+                  <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Например: Физика" className={inputCls} />
+                </div>
+              </div>
+              <div className="grid md:grid-cols-3 gap-4">
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Сложность</label>
+                  <select value={difficulty} onChange={e => setDifficulty(e.target.value)} className={inputCls}>
+                    <option>Лёгкий</option>
+                    <option>Средний</option>
+                    <option>Сложный</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Время (мин)</label>
+                  <input type="number" value={timeLimit} onChange={e => setTimeLimit(e.target.value)} min="5" max="180" className={inputCls} />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Проходной балл (%)</label>
+                  <input type="number" value={passingScore} onChange={e => setPassingScore(e.target.value)} min="1" max="100" className={inputCls} />
+                </div>
+              </div>
+              <div className="bg-muted/30 rounded-xl p-4 border border-border">
+                <p className="text-sm text-muted-foreground flex items-start gap-2">
+                  <Icon name="Info" size={14} className="text-primary mt-0.5 flex-shrink-0" />
+                  Ученики получат сертификат автоматически, если наберут {passingScore}% и выше.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="flex gap-4 h-full">
+              {/* Список вопросов */}
+              <div className="w-40 flex-shrink-0 space-y-1.5">
+                <p className="text-xs text-muted-foreground font-mono uppercase tracking-wider mb-2">Вопросы</p>
+                {questions.map((q, i) => (
+                  <div key={q.id} className="flex items-center gap-1">
+                    <button
+                      onClick={() => setActiveQ(i)}
+                      className={`flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors truncate ${
+                        activeQ === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                      }`}
+                    >
+                      {i + 1}. {q.text ? q.text.slice(0, 16) + (q.text.length > 16 ? "…" : "") : <span className="italic opacity-60">Пусто</span>}
+                    </button>
+                    {questions.length > 1 && (
+                      <button onClick={() => removeQuestion(i)} className="w-5 h-5 rounded flex items-center justify-center hover:bg-red-500/10 hover:text-red-400 text-muted-foreground transition-colors flex-shrink-0">
+                        <Icon name="X" size={10} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                <button
+                  onClick={addQuestion}
+                  className="w-full mt-2 px-3 py-2 rounded-lg border border-dashed border-border text-xs text-muted-foreground hover:border-primary/40 hover:text-primary transition-colors flex items-center gap-1.5"
+                >
+                  <Icon name="Plus" size={12} />
+                  Добавить
+                </button>
+              </div>
+
+              {/* Редактор вопроса */}
+              <div className="flex-1 space-y-4">
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-1.5">Текст вопроса {activeQ + 1}</label>
+                  <textarea
+                    value={currentQ.text}
+                    onChange={e => updateQuestion(e.target.value)}
+                    placeholder="Введите вопрос..."
+                    rows={3}
+                    className={inputCls + " resize-none"}
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground block mb-2">Варианты ответов <span className="text-xs">(отметьте правильный)</span></label>
+                  <div className="space-y-2">
+                    {currentQ.options.map(opt => (
+                      <div key={opt.id} className="flex items-center gap-2">
+                        <button
+                          onClick={() => setCorrect(opt.id)}
+                          className={`w-5 h-5 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-colors ${
+                            opt.correct ? "border-emerald-400 bg-emerald-400/20" : "border-border hover:border-primary/50"
+                          }`}
+                        >
+                          {opt.correct && <div className="w-2 h-2 rounded-full bg-emerald-400" />}
+                        </button>
+                        <input
+                          value={opt.text}
+                          onChange={e => updateOption(opt.id, e.target.value)}
+                          placeholder={`Вариант ${opt.id}`}
+                          className={inputCls}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Футер */}
+        {step !== "done" && (
+          <div className="flex items-center justify-between p-6 border-t border-border flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => step === "questions" ? setStep("info") : onClose()}
+              className="border-border text-foreground hover:bg-secondary gap-2"
+            >
+              <Icon name="ArrowLeft" size={14} />
+              {step === "questions" ? "Назад" : "Отмена"}
+            </Button>
+            {step === "info" ? (
+              <Button
+                onClick={() => setStep("questions")}
+                disabled={!title.trim() || !subject.trim()}
+                className="bg-primary text-white hover:bg-primary/90 gap-2 disabled:opacity-40"
+              >
+                Далее: вопросы
+                <Icon name="ArrowRight" size={14} />
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSave}
+                disabled={questions.some(q => !q.text.trim())}
+                className="bg-emerald-500 text-white hover:bg-emerald-600 gap-2 disabled:opacity-40"
+              >
+                <Icon name="Save" size={14} />
+                Сохранить тест
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── Профиль ─────────────────────────────────────────────────────────────────
+
 function ProfileSection() {
+  const [editing, setEditing] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [showBuilder, setShowBuilder] = useState(false);
+  const [createdTests, setCreatedTests] = useState<CreatedTest[]>([]);
+  const [notifications, setNotifications] = useState([
+    { id: 1, label: "Новые тесты", enabled: true },
+    { id: 2, label: "Результаты проверки", enabled: true },
+    { id: 3, label: "Напоминания о тестах", enabled: false },
+  ]);
+
+  const [profile, setProfile] = useState<ProfileData>({
+    firstName: "Александр",
+    lastName: "Петров",
+    middleName: "Иванович",
+    email: "a.petrov@mail.ru",
+    phone: "+7 (999) 123-45-67",
+    organization: "НИУ ВШЭ",
+    specialty: "Информационные технологии",
+    role: "teacher",
+  });
+
+  const [draft, setDraft] = useState<ProfileData>({ ...profile });
+
+  const handleSaveProfile = () => {
+    setProfile({ ...draft });
+    setEditing(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 3000);
+  };
+
+  const toggleNotification = (id: number) => {
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, enabled: !n.enabled } : n));
+  };
+
+  const inputCls = "w-full bg-input border border-border rounded-lg px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary/50 transition-all";
+
+  const fullName = `${profile.lastName} ${profile.firstName} ${profile.middleName}`.trim();
+
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-foreground mb-1">Профиль</h1>
-        <p className="text-muted-foreground">Личные данные и настройки</p>
+      {showBuilder && (
+        <TestBuilder
+          onClose={() => setShowBuilder(false)}
+          onSave={(test) => {
+            setCreatedTests(prev => [...prev, test]);
+            setShowBuilder(false);
+          }}
+        />
+      )}
+
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-foreground mb-1">Профиль</h1>
+          <p className="text-muted-foreground">Личные данные и настройки</p>
+        </div>
+        {saved && (
+          <div className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2 animate-fade-in">
+            <Icon name="CheckCircle" size={14} className="text-emerald-400" />
+            <span className="text-sm text-emerald-400">Данные сохранены</span>
+          </div>
+        )}
       </div>
 
       <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1">
+        {/* Карточка */}
+        <div className="md:col-span-1 space-y-4">
           <div className="bg-card border border-border rounded-xl p-6 text-center">
             <div className="w-20 h-20 rounded-full bg-primary/10 border-2 border-primary/30 flex items-center justify-center mx-auto mb-4">
               <Icon name="User" size={36} className="text-primary" />
             </div>
-            <h2 className="font-bold text-foreground text-lg">Александр Петров</h2>
-            <p className="text-muted-foreground text-sm mb-4">a.petrov@mail.ru</p>
+            <h2 className="font-bold text-foreground text-lg leading-tight">{fullName || "—"}</h2>
+            <p className="text-muted-foreground text-sm mb-4">{profile.email}</p>
             <div className="flex justify-center gap-2 flex-wrap">
-              <Badge className="bg-primary/10 text-primary border-primary/20 border">Студент</Badge>
+              <Badge className={profile.role === "teacher" ? "bg-amber-500/10 text-amber-400 border-amber-500/20 border" : "bg-primary/10 text-primary border-primary/20 border"}>
+                {profile.role === "teacher" ? "Учитель" : "Студент"}
+              </Badge>
               <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 border">Активен</Badge>
             </div>
-            <Button className="w-full mt-6 bg-secondary text-foreground hover:bg-secondary/80 gap-2">
-              <Icon name="Edit2" size={14} />
-              Редактировать
+            <Button
+              onClick={() => { setDraft({ ...profile }); setEditing(!editing); }}
+              className={`w-full mt-6 gap-2 ${editing ? "bg-secondary text-foreground hover:bg-secondary/80" : "bg-primary text-white hover:bg-primary/90"}`}
+            >
+              <Icon name={editing ? "X" : "Edit2"} size={14} />
+              {editing ? "Отменить" : "Редактировать"}
             </Button>
           </div>
+
+          {/* Кнопка учителя */}
+          {profile.role === "teacher" && (
+            <div className="bg-card border border-amber-500/20 rounded-xl p-5">
+              <div className="flex items-center gap-2 mb-3">
+                <Icon name="GraduationCap" size={16} className="text-amber-400" />
+                <span className="text-sm font-semibold text-foreground">Инструменты учителя</span>
+              </div>
+              <p className="text-xs text-muted-foreground mb-4">Создайте тест для своих учеников с вопросами и вариантами ответов</p>
+              <Button
+                onClick={() => setShowBuilder(true)}
+                className="w-full bg-amber-500 hover:bg-amber-600 text-white gap-2 font-semibold"
+              >
+                <Icon name="PenLine" size={16} />
+                Создать тест
+              </Button>
+              {createdTests.length > 0 && (
+                <p className="text-xs text-muted-foreground text-center mt-2">
+                  Создано тестов: {createdTests.length}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
+        {/* Данные */}
         <div className="md:col-span-2 space-y-4">
           <div className="bg-card border border-border rounded-xl p-6">
-            <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
-              <Icon name="User" size={16} className="text-primary" />
-              Личные данные
-            </h3>
-            <div className="space-y-3">
-              {[
-                { label: "Имя", value: "Александр" },
-                { label: "Фамилия", value: "Петров" },
-                { label: "Email", value: "a.petrov@mail.ru" },
-                { label: "Организация", value: "НИУ ВШЭ" },
-                { label: "Специальность", value: "Информационные технологии" },
-              ].map(field => (
-                <div key={field.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
-                  <span className="text-sm text-muted-foreground">{field.label}</span>
-                  <span className="text-sm text-foreground font-medium">{field.value}</span>
-                </div>
-              ))}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-foreground flex items-center gap-2">
+                <Icon name="User" size={16} className="text-primary" />
+                Личные данные
+              </h3>
+              {editing && (
+                <span className="text-xs bg-primary/10 text-primary border border-primary/20 rounded-full px-2 py-0.5">
+                  Режим редактирования
+                </span>
+              )}
             </div>
+
+            {editing ? (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Фамилия</label>
+                    <input value={draft.lastName} onChange={e => setDraft(d => ({ ...d, lastName: e.target.value }))} placeholder="Фамилия" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Имя</label>
+                    <input value={draft.firstName} onChange={e => setDraft(d => ({ ...d, firstName: e.target.value }))} placeholder="Имя" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Отчество</label>
+                    <input value={draft.middleName} onChange={e => setDraft(d => ({ ...d, middleName: e.target.value }))} placeholder="Отчество" className={inputCls} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Email</label>
+                    <input value={draft.email} onChange={e => setDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@example.com" type="email" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Телефон</label>
+                    <input value={draft.phone} onChange={e => setDraft(d => ({ ...d, phone: e.target.value }))} placeholder="+7 (999) 000-00-00" className={inputCls} />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Организация</label>
+                    <input value={draft.organization} onChange={e => setDraft(d => ({ ...d, organization: e.target.value }))} placeholder="Организация" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">Специальность</label>
+                    <input value={draft.specialty} onChange={e => setDraft(d => ({ ...d, specialty: e.target.value }))} placeholder="Специальность" className={inputCls} />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-muted-foreground block mb-1">Роль</label>
+                  <select value={draft.role} onChange={e => setDraft(d => ({ ...d, role: e.target.value as "student" | "teacher" }))} className={inputCls}>
+                    <option value="student">Студент / Ученик</option>
+                    <option value="teacher">Учитель / Преподаватель</option>
+                  </select>
+                </div>
+                <Button onClick={handleSaveProfile} className="bg-primary text-white hover:bg-primary/90 gap-2 mt-1">
+                  <Icon name="Save" size={14} />
+                  Сохранить изменения
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                {[
+                  { label: "Фамилия", value: profile.lastName },
+                  { label: "Имя", value: profile.firstName },
+                  { label: "Отчество", value: profile.middleName },
+                  { label: "Email", value: profile.email },
+                  { label: "Телефон", value: profile.phone },
+                  { label: "Организация", value: profile.organization },
+                  { label: "Специальность", value: profile.specialty },
+                  { label: "Роль", value: profile.role === "teacher" ? "Учитель / Преподаватель" : "Студент / Ученик" },
+                ].map(field => (
+                  <div key={field.label} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <span className="text-sm text-muted-foreground">{field.label}</span>
+                    <span className="text-sm text-foreground font-medium">{field.value || "—"}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
+          {/* Уведомления */}
           <div className="bg-card border border-border rounded-xl p-6">
             <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
               <Icon name="Bell" size={16} className="text-primary" />
               Уведомления
             </h3>
             <div className="space-y-3">
-              {[
-                { label: "Новые тесты", enabled: true },
-                { label: "Результаты проверки", enabled: true },
-                { label: "Напоминания о тестах", enabled: false },
-              ].map(n => (
-                <div key={n.label} className="flex items-center justify-between">
+              {notifications.map(n => (
+                <div key={n.id} className="flex items-center justify-between">
                   <span className="text-sm text-foreground">{n.label}</span>
-                  <div className={`w-10 h-5 rounded-full relative cursor-pointer transition-colors ${n.enabled ? "bg-primary" : "bg-muted"}`}>
-                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all ${n.enabled ? "right-0.5" : "left-0.5"}`} />
-                  </div>
+                  <button
+                    onClick={() => toggleNotification(n.id)}
+                    className={`w-10 h-5 rounded-full relative transition-colors ${n.enabled ? "bg-primary" : "bg-muted"}`}
+                  >
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-all duration-200 ${n.enabled ? "right-0.5" : "left-0.5"}`} />
+                  </button>
                 </div>
               ))}
             </div>
           </div>
+
+          {/* Созданные тесты */}
+          {createdTests.length > 0 && (
+            <div className="bg-card border border-border rounded-xl p-6">
+              <h3 className="font-bold text-foreground mb-4 flex items-center gap-2">
+                <Icon name="FileText" size={16} className="text-primary" />
+                Мои тесты ({createdTests.length})
+              </h3>
+              <div className="space-y-2">
+                {createdTests.map(t => (
+                  <div key={t.id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                    <div>
+                      <p className="text-sm font-medium text-foreground">{t.title}</p>
+                      <p className="text-xs text-muted-foreground">{t.subject} · {t.questions.length} вопр. · {t.timeLimit} мин</p>
+                    </div>
+                    <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-full px-2 py-0.5">Опубликован</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
